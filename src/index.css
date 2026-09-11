@@ -1,0 +1,138 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-fuchsia-500/30 text-white;
+  }
+}
+
+@layer utilities {
+  .gradient-text {
+    @apply bg-gradient-to-r from-violet-600 via-fuchsia-500 to-amber-400 bg-clip-text text-transparent;
+  }
+  .gradient-bg {
+    @apply bg-gradient-to-r from-violet-600 via-fuchsia-500 to-amber-400;
+  }
+  .glass {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+  }
+  .glass-hover {
+    @apply transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:shadow-[0_0_30px_-5px_rgba(217,70,239,0.3)] hover:scale-[1.03];
+  }
+  .glow-border {
+    box-shadow: 0 0 25px -3px rgba(217, 70, 239, 0.4), 0 0 50px -12px rgba(124, 58, 237, 0.3);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #7c3aed, #d946ef);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #8b5cf6, #e879f9);
+}
+
+/* Mesh gradient background */
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.mesh-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.3;
+}
+.mesh-blob-1 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #7c3aed, transparent 70%);
+  top: -10%;
+  left: -5%;
+  animation: mesh1 18s ease-in-out infinite;
+}
+.mesh-blob-2 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #d946ef, transparent 70%);
+  top: 30%;
+  right: -10%;
+  animation: mesh2 22s ease-in-out infinite;
+}
+.mesh-blob-3 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, #fbbf24, transparent 70%);
+  bottom: -10%;
+  left: 30%;
+  animation: mesh3 20s ease-in-out infinite;
+  opacity: 0.15;
+}
+
+@keyframes mesh1 {
+  0%, 100% { transform: translate(0%,0%) scale(1); }
+  50% { transform: translate(15%,-10%) scale(1.2); }
+}
+@keyframes mesh2 {
+  0%, 100% { transform: translate(0%,0%) scale(1); }
+  50% { transform: translate(-12%,15%) scale(1.15); }
+}
+@keyframes mesh3 {
+  0%, 100% { transform: translate(0%,0%) scale(1); }
+  50% { transform: translate(10%,12%) scale(1.1); }
+}
+
+/* Typing cursor blink */
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.animate-cursor-blink {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+/* Badge glow pulse */
+@keyframes badge-glow {
+  0%, 100% { box-shadow: 0 0 10px 0px rgba(217, 70, 239, 0.3), 0 0 20px -5px rgba(124, 58, 237, 0.2); }
+  50% { box-shadow: 0 0 25px 5px rgba(217, 70, 239, 0.6), 0 0 40px -5px rgba(124, 58, 237, 0.4); }
+}
+.badge-glow {
+  animation: badge-glow 2.5s ease-in-out infinite;
+}
+
+/* Confetti */
+@keyframes confetti-fall {
+  0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+.confetti-piece {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  top: 0;
+  animation: confetti-fall 3s ease-in forwards;
+  z-index: 100;
+}
