@@ -15,15 +15,17 @@ export default async function handler(req, res) {
         'X-Title': 'ViralForge'
       },
       body: JSON.stringify({
-        model: 'nvidia/nemotron-3.5-lightning:free',
+        model: 'nex-agi/nex-n2.5-mini:free',
+        reasoning_effort: 'none',
+        response_format: { type: 'json_object' },
         messages: [
           {
             role: 'system',
-            content: `You are a viral content expert for ${platform}. Always respond using exactly these four labeled lines, each on its own line, with no extra commentary before or after:\nHOOK: ...\nBODY: ...\nCTA: ...\nVIRAL_SCORE: <a number 0-100>`
+            content: `You are a viral content expert for ${platform}. Respond with ONLY a raw JSON object (no markdown fences, no commentary) matching exactly this shape: {"hook": string, "body": string, "cta": string, "viralScore": number between 0 and 100}.`
           },
           {
             role: 'user',
-            content: `Create a viral ${format} script about: "${topic}".`
+            content: `Create a viral ${format} script about: "${topic}". Return only the JSON object.`
           }
         ],
         temperature: 0.8,
@@ -42,35 +44,28 @@ export default async function handler(req, res) {
       });
     }
 
-    const content = data.choices[0].message.content || '';
+    let content = data.choices[0].message.content || '';
+    // Strip markdown code fences if the model added them despite instructions.
+    content = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
 
-    // Robust parsing: tolerant of single/double newlines, extra spacing, case variations.
-    const extract = (label, nextLabels) => {
-      const nextPattern = nextLabels.length
-        ? `(?:\\n\\s*(?:${nextLabels.join('|')}):|$)`
-        : '$';
-      const re = new RegExp(`${label}:\\s*([\\s\\S]*?)${nextPattern}`, 'i');
-      return content.match(re)?.[1]?.trim() || '';
-    };
-
-    const hook = extract('HOOK', ['BODY', 'CTA', 'VIRAL_SCORE']);
-    const body = extract('BODY', ['CTA', 'VIRAL_SCORE']);
-    const cta = extract('CTA', ['VIRAL_SCORE']);
-    const scoreMatch = content.match(/VIRAL_SCORE:\s*(\d+)/i);
-    const viralScore = scoreMatch ? parseInt(scoreMatch[1]) : 75;
-
-    // If parsing still failed entirely (model ignored the format), fall back to raw content
-    // so the user at least sees something instead of empty boxes.
-    if (!hook && !body && !cta) {
-      console.error('Could not parse labeled sections, raw content:', content);
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseErr) {
+      console.error('Could not parse JSON from model, raw content:', content);
       return res.status(200).json({
         hook: '',
-        body: content.trim(),
+        body: content || 'The AI returned an unexpected response. Please try again.',
         cta: '',
-        viralScore,
-        warning: 'AI response was not in the expected format; showing raw output in Body.',
+        viralScore: 75,
+        warning: 'AI response was not valid JSON; showing raw output in Body.',
       });
     }
+
+    const hook = String(parsed.hook || '').trim();
+    const body = String(parsed.body || '').trim();
+    const cta = String(parsed.cta || '').trim();
+    const viralScore = Number.isFinite(parsed.viralScore) ? Math.round(parsed.viralScore) : 75;
 
     res.status(200).json({ hook, body, cta, viralScore });
 
