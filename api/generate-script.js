@@ -15,7 +15,7 @@ export default async function handler(req, res) {
         'X-Title': 'ViralForge'
       },
       body: JSON.stringify({
-        model: 'qwen/qwen-2.5-7b-instruct:free',
+        model: 'nvidia/nemotron-3.5-lightning:free',
         messages: [
           {
             role: 'system',
