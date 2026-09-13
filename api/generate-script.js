@@ -19,16 +19,11 @@ export default async function handler(req, res) {
         messages: [
           {
             role: 'system',
-            content: `You are a viral content expert for ${platform}.`
+            content: `You are a viral content expert for ${platform}. Always respond using exactly these four labeled lines, each on its own line, with no extra commentary before or after:\nHOOK: ...\nBODY: ...\nCTA: ...\nVIRAL_SCORE: <a number 0-100>`
           },
           {
             role: 'user',
-            content: `Create a viral ${format} script about: "${topic}".
-Format:
-HOOK: [attention-grabbing opening]
-BODY: [main content]
-CTA: [call to action]
-VIRAL_SCORE: [0-100]`
+            content: `Create a viral ${format} script about: "${topic}".`
           }
         ],
         temperature: 0.8,
@@ -47,13 +42,35 @@ VIRAL_SCORE: [0-100]`
       });
     }
 
-    const content = data.choices[0].message.content;
+    const content = data.choices[0].message.content || '';
 
-    const hook = content.match(/HOOK:\s*(.+?)(?=\n\nBODY:)/s)?.[1]?.trim() || '';
-    const body = content.match(/BODY:\s*(.+?)(?=\n\nCTA:)/s)?.[1]?.trim() || '';
-    const cta = content.match(/CTA:\s*(.+?)(?=\n\nVIRAL_SCORE:)/s)?.[1]?.trim() || '';
-    const scoreMatch = content.match(/VIRAL_SCORE:\s*(\d+)/);
+    // Robust parsing: tolerant of single/double newlines, extra spacing, case variations.
+    const extract = (label, nextLabels) => {
+      const nextPattern = nextLabels.length
+        ? `(?:\\n\\s*(?:${nextLabels.join('|')}):|$)`
+        : '$';
+      const re = new RegExp(`${label}:\\s*([\\s\\S]*?)${nextPattern}`, 'i');
+      return content.match(re)?.[1]?.trim() || '';
+    };
+
+    const hook = extract('HOOK', ['BODY', 'CTA', 'VIRAL_SCORE']);
+    const body = extract('BODY', ['CTA', 'VIRAL_SCORE']);
+    const cta = extract('CTA', ['VIRAL_SCORE']);
+    const scoreMatch = content.match(/VIRAL_SCORE:\s*(\d+)/i);
     const viralScore = scoreMatch ? parseInt(scoreMatch[1]) : 75;
+
+    // If parsing still failed entirely (model ignored the format), fall back to raw content
+    // so the user at least sees something instead of empty boxes.
+    if (!hook && !body && !cta) {
+      console.error('Could not parse labeled sections, raw content:', content);
+      return res.status(200).json({
+        hook: '',
+        body: content.trim(),
+        cta: '',
+        viralScore,
+        warning: 'AI response was not in the expected format; showing raw output in Body.',
+      });
+    }
 
     res.status(200).json({ hook, body, cta, viralScore });
 
