@@ -119,11 +119,14 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
   const [generating, setGenerating] = useState(false);
   const [genStep, setGenStep] = useState(-1);
   const [generated, setGenerated] = useState(false);
-  const [viralScore] = useState(87);
+  const [viralScore, setViralScore] = useState(87);
   const [confetti, setConfetti] = useState(false);
   const [activeTag, setActiveTag] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [playProgress, setPlayProgress] = useState(0);
+  const [script, setScript] = useState(mockScript);
+  const [imageUrl, setImageUrl] = useState('');
+  const [genError, setGenError] = useState('');
 
   const togglePlatform = (id: string) => {
     setSelectedPlatforms((prev) =>
@@ -131,22 +134,65 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
     );
   };
 
-  const startGenerate = () => {
+  const startGenerate = async () => {
     setGenerating(true);
     setGenStep(0);
     setGenerated(false);
-  };
+    setGenError('');
 
-  useEffect(() => {
-    if (!generating) return;
-    if (genStep >= generateSteps.length) {
+    try {
+      setGenStep(1);
+      const scriptRes = await fetch('/api/generate-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          platform: selectedPlatforms[0] || 'tiktok',
+          format: selectedFormat,
+        }),
+      });
+      const scriptData = await scriptRes.json();
+      if (scriptData.error) throw new Error(scriptData.error);
+      setScript({ hook: scriptData.hook, body: scriptData.body, cta: scriptData.cta });
+      setViralScore(scriptData.viralScore);
+
+      setGenStep(2);
+      const imageRes = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: `${topic}, ${scriptData.hook}`.slice(0, 300) }),
+      });
+      const imageData = await imageRes.json();
+      if (imageData.error) throw new Error(imageData.error);
+      setImageUrl(imageData.imageUrl);
+
+      setGenStep(3);
+      const saveRes = await fetch('/api/save-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: topic,
+          platform: selectedPlatforms[0] || 'tiktok',
+          format: selectedFormat,
+          script: `${scriptData.hook}\n\n${scriptData.body}\n\n${scriptData.cta}`,
+          viralScore: scriptData.viralScore,
+          imageUrl: imageData.imageUrl,
+        }),
+      });
+      const saveData = await saveRes.json();
+      if (saveData.error) throw new Error(saveData.error);
+
+      setGenStep(4);
       setGenerating(false);
       setGenerated(true);
-      return;
+    } catch (err) {
+      setGenerating(false);
+      setGenStep(-1);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setGenError(message);
+      showToast(`Generation failed: ${message}`, 'error');
     }
-    const timer = setTimeout(() => setGenStep((s) => s + 1), 900);
-    return () => clearTimeout(timer);
-  }, [generating, genStep]);
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -181,6 +227,9 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
     setGenStep(-1);
     setPlaying(false);
     setPlayProgress(0);
+    setScript(mockScript);
+    setImageUrl('');
+    setGenError('');
   };
 
   const stepLabels = ['Idea', 'Format', 'Generate', 'Export'];
@@ -377,7 +426,8 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
               <div>
                 <label className="text-xs text-fuchsia-400 mb-1 block font-medium">Hook</label>
                 <textarea
-                  defaultValue={mockScript.hook}
+                  value={script.hook}
+                  onChange={(e) => setScript((s) => ({ ...s, hook: e.target.value }))}
                   className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-sm text-slate-100 focus:border-fuchsia-500/50 focus:outline-none resize-none transition-colors"
                   rows={2}
                 />
@@ -385,7 +435,8 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
               <div>
                 <label className="text-xs text-fuchsia-400 mb-1 block font-medium">Body</label>
                 <textarea
-                  defaultValue={mockScript.body}
+                  value={script.body}
+                  onChange={(e) => setScript((s) => ({ ...s, body: e.target.value }))}
                   className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-sm text-slate-100 focus:border-fuchsia-500/50 focus:outline-none resize-none transition-colors"
                   rows={6}
                 />
@@ -393,7 +444,8 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
               <div>
                 <label className="text-xs text-fuchsia-400 mb-1 block font-medium">CTA</label>
                 <textarea
-                  defaultValue={mockScript.cta}
+                  value={script.cta}
+                  onChange={(e) => setScript((s) => ({ ...s, cta: e.target.value }))}
                   className="w-full bg-slate-900/50 border border-white/10 rounded-lg p-3 text-sm text-slate-100 focus:border-fuchsia-500/50 focus:outline-none resize-none transition-colors"
                   rows={2}
                 />
@@ -467,14 +519,25 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
                   className="w-full space-y-4"
                 >
                   <Gauge value={viralScore} size={120} label="Viral Score" />
+                  {imageUrl && (
+                    <img
+                      src={imageUrl}
+                      alt="Generated visual"
+                      className="w-full max-h-40 object-cover rounded-xl border border-white/10"
+                    />
+                  )}
                   <div className="glass p-3 max-h-40 overflow-y-auto">
-                    <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">{mockScript.body}</p>
+                    <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">{script.body}</p>
                   </div>
                   <Button onClick={() => setStep(4)} className="w-full">
                     Proceed to Export
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </motion.div>
+              )}
+
+              {genError && !generating && (
+                <p className="text-xs text-red-400 text-center max-w-xs">{genError}</p>
               )}
 
               <div className="flex gap-2">
