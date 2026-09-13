@@ -635,11 +635,45 @@ function CreateTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
 }
 
 /* ============ TAB 2: PROJECTS ============ */
+interface RealProject {
+  id: string;
+  name: string;
+  platform: string;
+  format: string;
+  score: number;
+  status: string;
+  date: string;
+  imageUrl: string;
+  script: string;
+}
+
 function ProjectsTab({ showToast }: { showToast: DashboardProps['showToast'] }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [realProjects, setRealProjects] = useState<RealProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
-  const filtered = projects.filter((p) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/get-projects');
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        if (!cancelled) setRealProjects(data.projects || []);
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load projects');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = realProjects.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === 'all' || p.platform === filter;
     return matchesSearch && matchesFilter;
@@ -677,38 +711,53 @@ function ProjectsTab({ showToast }: { showToast: DashboardProps['showToast'] }) 
         </select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((p) => (
-          <motion.div
-            key={p.id}
-            layout
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass glass-hover p-5 cursor-pointer"
-            onClick={() => showToast(`Opening ${p.name}`, 'info')}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <Badge variant="default">{platformNames[p.platform]}</Badge>
-              <Badge variant={p.score >= 85 ? 'success' : 'warning'}>
-                <TrendingUp className="w-3 h-3" />
-                {p.score}
-              </Badge>
-            </div>
-            <h4 className="font-semibold text-sm mb-2">{p.name}</h4>
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${statusColors[p.status]}`} />
-                <span className="capitalize">{p.status}</span>
-              </div>
-              <span>{p.date}</span>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {loading && (
+        <div className="text-center py-12 text-slate-500">Loading your projects...</div>
+      )}
 
-      {filtered.length === 0 && (
+      {!loading && loadError && (
+        <div className="text-center py-12 text-red-400">{loadError}</div>
+      )}
+
+      {!loading && !loadError && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((p) => (
+            <motion.div
+              key={p.id}
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="glass glass-hover overflow-hidden cursor-pointer"
+              onClick={() => showToast(`Opening ${p.name}`, 'info')}
+            >
+              {p.imageUrl && (
+                <img src={p.imageUrl} alt={p.name} className="w-full h-32 object-cover" />
+              )}
+              <div className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <Badge variant="default">{platformNames[p.platform] || p.platform}</Badge>
+                  <Badge variant={p.score >= 85 ? 'success' : 'warning'}>
+                    <TrendingUp className="w-3 h-3" />
+                    {p.score}
+                  </Badge>
+                </div>
+                <h4 className="font-semibold text-sm mb-2">{p.name}</h4>
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${statusColors[p.status]}`} />
+                    <span className="capitalize">{p.status}</span>
+                  </div>
+                  <span>{p.date}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {!loading && !loadError && filtered.length === 0 && (
         <div className="text-center py-12 text-slate-500">
-          No projects found. Try a different search or filter.
+          No projects yet. Generate your first one in the Create tab.
         </div>
       )}
     </div>
