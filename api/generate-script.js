@@ -37,6 +37,16 @@ VIRAL_SCORE: [0-100]`
     });
 
     const data = await response.json();
+
+    if (!response.ok || !data.choices || !data.choices[0]) {
+      console.error('OpenRouter error response:', JSON.stringify(data));
+      return res.status(500).json({
+        error: 'OpenRouter API error',
+        status: response.status,
+        details: data,
+      });
+    }
+
     const content = data.choices[0].message.content;
 
     const hook = content.match(/HOOK:\s*(.+?)(?=\n\nBODY:)/s)?.[1]?.trim() || '';
@@ -48,7 +58,7 @@ VIRAL_SCORE: [0-100]`
     res.status(200).json({ hook, body, cta, viralScore });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to generate' });
+    console.error('generate-script fatal error:', error);
+    res.status(500).json({ error: 'Failed to generate', details: String(error) });
   }
 }
